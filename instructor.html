@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paraphrase Detective — Instructor</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#171923;--muted:#667085;--line:#d9dee8;--accent:#5b35d5;--good:#177245;--bad:#b42318}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.shell{max-width:1200px;margin:auto;padding:24px 16px 60px}
+.hero{background:linear-gradient(135deg,#4c2ec6,#7a59e8);color:#fff;border-radius:20px;padding:24px}
+.hero h1{margin:0 0 6px}.hero p{margin:0;opacity:.9}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:16px;box-shadow:0 8px 24px rgba(16,24,40,.05)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
+#key{min-width:260px}.search{min-width:220px}
+button{padding:11px 14px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
+button.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.status{font-size:13px;color:var(--muted);margin-left:auto}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.stat b{font-size:26px;display:block}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);position:sticky;top:0;background:#fff}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800;background:#eee}
+.done{background:#ecfdf3;color:var(--good)}.working{background:#f0edff;color:#4022a8}
+.reason{max-width:320px;white-space:normal}
+.small{font-size:12px;color:var(--muted)}
+.err{color:var(--bad);font-weight:700}
+dialog{border:0;border-radius:16px;padding:0;max-width:760px;width:calc(100% - 30px)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.modal{padding:20px}.answerrow{padding:10px 0;border-bottom:1px solid var(--line)}
+@media(max-width:700px){.status{width:100%;margin-left:0}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <section class="hero">
+    <h1>Instructor View</h1>
+    <p>Paraphrase Detective — student progress and results</p>
+  </section>
+
+  <section class="card">
+    <div class="controls">
+      <input id="key" type="password" placeholder="Instructor key">
+      <button onclick="connect()">Connect</button>
+      <button class="secondary" onclick="refreshNow()">Refresh</button>
+      <input id="search" class="search" placeholder="Search name / class" oninput="render()">
+      <span id="status" class="status">Not connected</span>
+    </div>
+    <div class="small" style="margin-top:10px">Auto-refresh: every 10 seconds while connected.</div>
+  </section>
+
+  <div id="summary" class="summary"></div>
+
+  <section class="card tablewrap">
+    <table>
+      <thead><tr>
+        <th>Student</th><th>Class</th><th>Status</th><th>Progress</th>
+        <th>Score</th><th>Latest explanation</th><th>Last activity</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="8" class="small">Connect to load students.</td></tr></tbody>
+    </table>
+  </section>
+</div>
+
+<dialog id="detailDialog">
+  <div class="modal">
+    <div class="controls">
+      <h2 id="detailTitle" style="margin:0;flex:1"></h2>
+      <button class="secondary" onclick="detailDialog.close()">Close</button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</dialog>
+
+<script>
+// Paste the SAME Apps Script /exec URL used in index.html.
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwSF0dCArNvc1qFE-iRdtcxO3AFWHU-x_-l0dXL1DCA3GiVrXsr2zplcbOKyvYLwFuG/exec';
+
+let students=[];
+let timer=null;
+
+function configured(){
+  return BACKEND_URL && !BACKEND_URL.includes('PASTE_APPS_SCRIPT');
+}
+
+function connect(){
+  if(!configured()){
+    setStatus('Add your Apps Script /exec URL to instructor.html first.',true);
+    return;
+  }
+  const key=document.getElementById('key').value.trim();
+  if(!key){setStatus('Enter the instructor key.',true);return;}
+  sessionStorage.setItem('pdInstructorKey',key);
+  refreshNow();
+  if(timer) clearInterval(timer);
+  timer=setInterval(refreshNow,10000);
+}
+
+function refreshNow(){
+  const key=document.getElementById('key').value.trim() || sessionStorage.getItem('pdInstructorKey') || '';
+  if(!key){setStatus('Enter the instructor key.',true);return;}
+  document.getElementById('key').value=key;
+  setStatus('Loading…');
+
+  // JSONP avoids CORS problems between GitHub Pages and Apps Script.
+  const old=document.getElementById('jsonp');
+  if(old) old.remove();
+  const s=document.createElement('script');
+  s.id='jsonp';
+  s.src=BACKEND_URL+'?action=list&key='+encodeURIComponent(key)
+    +'&callback=progressCallback&_='+Date.now();
+  s.onerror=()=>setStatus('Could not reach Apps Script.',true);
+  document.body.appendChild(s);
+}
+
+function progressCallback(data){
+  if(!data || !data.ok){
+    setStatus(data?.error || 'Could not load progress.',true);
+    return;
+  }
+  students=data.students || [];
+  setStatus('Updated '+new Date().toLocaleTimeString());
+  render();
+}
+
+function setStatus(msg,isErr=false){
+  const el=document.getElementById('status');
+  el.textContent=msg;
+  el.className='status'+(isErr?' err':'');
+}
+
+function render(){
+  const q=(document.getElementById('search').value||'').trim().toLowerCase();
+  const filtered=students.filter(s=>
+    !q || (s.name||'').toLowerCase().includes(q) || (s.className||'').toLowerCase().includes(q)
+  );
+
+  const completed=students.filter(s=>s.status==='completed').length;
+  const active=students.length-completed;
+  const avg=completed
+    ? Math.round(students.filter(s=>s.status==='completed').reduce((n,s)=>n+Number(s.percent||0),0)/completed)
+    : 0;
+
+  document.getElementById('summary').innerHTML=
+    stat('Students',students.length)+stat('In progress',active)+stat('Completed',completed)+stat('Completed avg.',avg+'%');
+
+  const body=document.getElementById('tbody');
+  if(!filtered.length){
+    body.innerHTML='<tr><td colspan="8" class="small">No matching students.</td></tr>';
+    return;
+  }
+
+  body.innerHTML=filtered.map((s,i)=>`
+    <tr>
+      <td><b>${esc(s.name||'Unnamed')}</b><div class="small">${esc(shortId(s.studentId))}</div></td>
+      <td>${esc(s.className||'—')}</td>
+      <td><span class="badge ${s.status==='completed'?'done':'working'}">${s.status==='completed'?'Completed':'In progress'}</span></td>
+      <td>${Number(s.answeredCount||0)}/${Number(s.totalQuestions||25)} answered<br><span class="small">currently Q${Number(s.currentQuestion||1)}</span></td>
+      <td><b>${Number(s.score||0)}/${Number(s.totalQuestions||25)}</b><br><span class="small">${Number(s.percent||0)}%</span></td>
+      <td class="reason">${esc(s.lastReason||'—')}</td>
+      <td>${timeAgo(s.updatedAt)}<div class="small">${formatTime(s.updatedAt)}</div></td>
+      <td><button class="secondary" onclick="showDetail('${escAttr(s.studentId)}')">Details</button></td>
+    </tr>`).join('');
+}
+
+function showDetail(id){
+  const s=students.find(x=>x.studentId===id);
+  if(!s) return;
+  document.getElementById('detailTitle').textContent=(s.name||'Student')+' — '+(s.score||0)+'/'+(s.totalQuestions||25);
+
+  const answers=(s.answers||[]).slice().sort((a,b)=>a.questionIndex-b.questionIndex);
+  document.getElementById('detailBody').innerHTML=
+    `<p><b>Class:</b> ${esc(s.className||'—')} &nbsp; <b>Status:</b> ${esc(s.status)}</p>`+
+    (answers.length ? answers.map(a=>`
+      <div class="answerrow">
+        <b>Q${Number(a.questionIndex)+1} — ${a.correct?'✓ Correct':'✗ Incorrect'}</b>
+        <div class="small">Choice ${['A','B','C','D'][a.choice] || '?'} • ${esc(a.stage||'')}</div>
+        <div style="margin-top:5px">${esc(a.reason||'No explanation')}</div>
+      </div>`).join('') : '<p class="small">No submitted answers yet.</p>');
+
+  document.getElementById('detailDialog').showModal();
+}
+
+function stat(label,value){return `<div class="stat"><span class="small">${esc(label)}</span><b>${esc(String(value))}</b></div>`}
+function shortId(id){return id ? String(id).slice(0,8) : ''}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function escAttr(s){return String(s??'').replace(/'/g,'&#39;')}
+function formatTime(v){if(!v)return '—'; const d=new Date(v); return isNaN(d)?esc(v):d.toLocaleString()}
+function timeAgo(v){
+  if(!v)return '—';
+  const d=new Date(v), sec=Math.round((Date.now()-d.getTime())/1000);
+  if(isNaN(sec)) return '—';
+  if(sec<60)return sec+'s ago';
+  if(sec<3600)return Math.floor(sec/60)+'m ago';
+  if(sec<86400)return Math.floor(sec/3600)+'h ago';
+  return Math.floor(sec/86400)+'d ago';
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const k=sessionStorage.getItem('pdInstructorKey');
+  if(k) document.getElementById('key').value=k;
+});
+</script>
+</body>
+</html>

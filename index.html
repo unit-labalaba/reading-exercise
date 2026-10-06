@@ -51,6 +51,8 @@ button.secondary{border:1px solid var(--line);border-radius:12px;background:whit
 .reason-box textarea:focus{border-color:#8b75e8;box-shadow:0 0 0 3px rgba(91,53,213,.10)}
 .your-reason{margin:10px 0;padding:10px 12px;background:#fff;border:1px dashed var(--line);border-radius:10px}
 
+.sync-note{font-size:12px;color:var(--muted);margin-top:8px}
+.resume-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
 .hidden{display:none!important}
 @media(max-width:600px){.card{padding:18px}.source{font-size:18px}.score{margin-left:0;width:100%}}
 </style>
@@ -60,12 +62,15 @@ button.secondary{border:1px solid var(--line);border-radius:12px;background:whit
   <section class="hero">
     <h1>🕵️ Paraphrase Detective</h1>
     <p>TOEFL Reading practice: match meaning, not identical words.</p>
+    <div id="syncStatus" class="sync-note" style="color:rgba(255,255,255,.85)">Progress is saved on this browser.</div>
   </section>
 
   <div id="start" class="card start">
     <h2>Ready to investigate?</h2>
-    <p>25 questions • 5 levels • instant explanations</p>
-    <input id="studentName" class="name" placeholder="Your name (optional)">
+    <p>20 questions • 5 levels • instant explanations</p>
+    <input id="studentName" class="name" placeholder="Your name" autocomplete="name">
+    <input id="studentClass" class="name" placeholder="Class / group (optional)" autocomplete="off">
+    <div id="resumeNote" class="tip hidden"></div>
     <div><button class="primary" onclick="startQuiz()">Start activity</button></div>
     <div class="tip"><b>Detective rule:</b> Before choosing, check synonyms, grammar changes, quantity words, cause/contrast, and time.</div>
   </div>
@@ -109,31 +114,167 @@ button.secondary{border:1px solid var(--line);border-radius:12px;background:whit
     <p id="finalMsg"></p>
     <div id="breakdown" class="breakdown"></div>
     <div class="controls" style="justify-content:center">
-      <button class="secondary" onclick="restartQuiz()">Try again</button>
+      <button class="secondary" onclick="copyResult()">Copy result</button>
+      <button class="secondary" onclick="restartQuiz()">Start over</button>
     </div>
   </div>
 </div>
 
+
 <script>
-const questions = [{"stage": "Word & Phrase Changes", "src": "Early settlers depended heavily on rivers for transportation.", "opts": ["Rivers prevented early settlers from traveling.", "Early settlers relied greatly on waterways to travel.", "Most settlers lived directly beside rivers.", "Transportation caused settlers to build rivers."], "ans": 1, "map": "depended heavily → relied greatly; rivers → waterways; transportation → travel", "why": "B is the true paraphrase. A reverses the idea; C and D add or distort information."}, {"stage": "Word & Phrase Changes", "src": "The population declined rapidly after the severe winter.", "opts": ["The population increased after winter.", "The number of inhabitants fell quickly after the harsh winter.", "The winter lasted for many years.", "Only a few people noticed the winter."], "ans": 1, "map": "declined rapidly → fell quickly; severe → harsh", "why": "B keeps the same meaning without adding new information."}, {"stage": "Word & Phrase Changes", "src": "The device was designed primarily for use in hospitals.", "opts": ["The device was mainly intended for hospitals.", "Hospitals refused to use the device.", "The device was designed in a hospital.", "The device was used only by doctors."], "ans": 0, "map": "primarily → mainly; designed for use → intended for", "why": "A is equivalent. D is too narrow and too strong."}, {"stage": "Word & Phrase Changes", "src": "The discovery had a significant impact on later research.", "opts": ["The discovery stopped later studies.", "The discovery strongly influenced later research.", "Later research produced the discovery.", "Researchers immediately accepted the discovery."], "ans": 1, "map": "significant impact → strongly influenced", "why": "B preserves both the relationship and the degree of impact."}, {"stage": "Word & Phrase Changes", "src": "The animals obtain most of their water from the food they eat.", "opts": ["The animals get most of their water through their diet.", "The animals drink large amounts of water every day.", "Their food contains no water.", "The animals can survive without food."], "ans": 0, "map": "obtain → get; food they eat → diet", "why": "A is the direct paraphrase."}, {"stage": "Grammar Changes", "src": "Because rainfall was limited, crops grew poorly.", "opts": ["Heavy rain damaged the crops.", "A lack of rain reduced crop growth.", "The crops caused rainfall to decrease.", "Farmers stopped growing crops because of rain."], "ans": 1, "map": "rainfall was limited → lack of rain; crops grew poorly → reduced crop growth", "why": "B changes the grammar but preserves the cause-and-effect relationship."}, {"stage": "Grammar Changes", "src": "The construction of railroads allowed goods to be transported more efficiently.", "opts": ["Railways made the transportation of goods more efficient.", "Goods were transported before railroads were built.", "Railroads made goods more expensive.", "Only railroads could transport goods."], "ans": 0, "map": "construction of railroads → railways; allowed ... more efficiently → made ... more efficient", "why": "A expresses the same idea using a different grammatical structure."}, {"stage": "Grammar Changes", "src": "Although the region is dry, several crops can be grown there.", "opts": ["No crops can grow in dry regions.", "Several crops grow there because the region is dry.", "Despite the dry climate, the region can support several crops.", "The climate is becoming wetter every year."], "ans": 2, "map": "although → despite; region is dry → dry climate; can be grown → can support", "why": "C preserves the contrast in the original sentence."}, {"stage": "Grammar Changes", "src": "The new law prohibited factories from dumping waste into the river.", "opts": ["Factories were encouraged to put waste in the river.", "The new law prevented factories from disposing of waste in the river.", "Factories closed because the river was polluted.", "The law required factories to use river water."], "ans": 1, "map": "prohibited → prevented; dumping → disposing of", "why": "B keeps the same agent, action, and restriction."}, {"stage": "Grammar Changes", "src": "The species was unable to survive the sudden change in climate.", "opts": ["The species could not survive the abrupt climate change.", "The species adapted easily to the new climate.", "The climate changed because the species disappeared.", "The species moved before the climate changed."], "ans": 0, "map": "was unable to → could not; sudden → abrupt", "why": "A is a clean structural and lexical paraphrase."}, {"stage": "Paraphrase vs. Trap", "src": "Most residents opposed the proposal because they believed it would increase traffic.", "opts": ["All residents rejected the proposal.", "Many residents objected to the proposal due to concerns about heavier traffic.", "Residents supported the proposal because traffic was increasing.", "The proposal immediately caused severe traffic."], "ans": 1, "map": "most → many; opposed → objected; believed it would increase traffic → concerns about heavier traffic", "why": "B preserves the meaning. A changes most to all, C reverses it, and D changes a prediction into a fact."}, {"stage": "Paraphrase vs. Trap", "src": "The study found little evidence that the treatment improved long-term memory.", "opts": ["The treatment clearly improved memory for many years.", "The study provided limited support for a lasting memory benefit.", "The treatment had no effect on any type of memory.", "Researchers did not study memory."], "ans": 1, "map": "little evidence → limited support; improved long-term memory → lasting memory benefit", "why": "B preserves the uncertainty. C becomes too absolute."}, {"stage": "Paraphrase vs. Trap", "src": "Some coastal cities have built sea walls to reduce damage from storms.", "opts": ["Every coastal city uses sea walls.", "Sea walls completely prevent storms.", "Certain coastal cities use sea walls to lessen storm damage.", "Coastal cities build walls because storms are rare."], "ans": 2, "map": "some → certain; reduce → lessen; damage from storms → storm damage", "why": "C preserves both quantity and purpose."}, {"stage": "Paraphrase vs. Trap", "src": "The company delayed the launch until engineers resolved several technical problems.", "opts": ["The product was released before the problems were fixed.", "Engineers created new problems after the launch.", "The launch was postponed while engineers fixed technical issues.", "The company cancelled the product permanently."], "ans": 2, "map": "delayed → postponed; resolved → fixed; technical problems → technical issues", "why": "C preserves the timeline and meaning."}, {"stage": "Paraphrase vs. Trap", "src": "The forest provides habitat for numerous species, many of which are endangered.", "opts": ["The forest is home to many species, including many at risk of extinction.", "Only endangered species live in the forest.", "The forest threatens most species that live there.", "Numerous forests are endangered."], "ans": 0, "map": "provides habitat → is home to; numerous → many; endangered → at risk of extinction", "why": "A keeps the original scope. B incorrectly changes many to only."}, {"stage": "TOEFL-Style Restatement", "src": "As cities expanded, farmland near urban areas was gradually converted to housing.", "opts": ["Urban growth slowly caused nearby agricultural land to become residential areas.", "Farmers moved into cities because housing was cheaper.", "Cities expanded only after farmland disappeared.", "Housing near cities was converted into farms."], "ans": 0, "map": "cities expanded → urban growth; farmland → agricultural land; converted to housing → become residential areas", "why": "A preserves the cause, location, and gradual change."}, {"stage": "TOEFL-Style Restatement", "src": "Unlike earlier models, the new machine requires less maintenance and consumes less energy.", "opts": ["Earlier machines used less energy than the new model.", "The new machine is more demanding to maintain.", "Compared with older models, the new machine needs less upkeep and energy.", "The new machine requires no maintenance or energy."], "ans": 2, "map": "unlike earlier models → compared with older models; maintenance → upkeep; consumes less energy → needs less energy", "why": "C is equivalent. D wrongly makes the claim absolute."}, {"stage": "TOEFL-Style Restatement", "src": "Scientists initially attributed the decline to disease, but later evidence suggested habitat loss was the main cause.", "opts": ["Scientists always believed habitat loss was responsible.", "Disease and habitat loss were proven equally important.", "Researchers first blamed disease, but later evidence pointed mainly to habitat loss.", "Later evidence showed that the population had not declined."], "ans": 2, "map": "initially attributed → first blamed; suggested → pointed to; main cause → mainly", "why": "C accurately preserves the change in explanation."}, {"stage": "TOEFL-Style Restatement", "src": "The material is valued not only for its strength but also for its resistance to heat.", "opts": ["The material is useful because it is strong and can withstand heat.", "Heat makes the material stronger.", "The material is valuable only because it is strong.", "The material cannot be used in hot conditions."], "ans": 0, "map": "strength → strong; resistance to heat → can withstand heat", "why": "A preserves both reasons given in the passage."}, {"stage": "TOEFL-Style Restatement", "src": "By the time the expedition arrived, the settlement had already been abandoned.", "opts": ["The expedition left before reaching the settlement.", "People deserted the settlement before the expedition reached it.", "The settlement was abandoned because of the expedition.", "The expedition and residents left at the same time."], "ans": 1, "map": "had already been abandoned → people deserted ... before; arrived → reached", "why": "B preserves the sequence without inventing a cause."}, {"stage": "Passage-Style Challenge", "src": "The introduction of refrigeration transformed food distribution. Products that once spoiled quickly could now be shipped over much greater distances.", "opts": ["Refrigeration made it possible to transport perishable food farther.", "Food began to spoil more quickly after refrigeration appeared.", "Refrigeration reduced the distance food could be shipped.", "Only nonperishable food benefited from refrigeration."], "ans": 0, "map": "spoiled quickly → perishable; shipped over much greater distances → transport ... farther", "why": "A compresses the two sentences into one accurate paraphrase."}, {"stage": "Passage-Style Challenge", "src": "Many early maps were based on travelers' reports rather than direct measurement, so they often contained serious inaccuracies.", "opts": ["Early maps were usually precise because travelers measured them directly.", "Reports from travelers sometimes made early maps significantly inaccurate.", "Travelers stopped using maps because they were inaccurate.", "Direct measurement was common in the earliest maps."], "ans": 1, "map": "based on travelers' reports → reports from travelers; serious inaccuracies → significantly inaccurate", "why": "B preserves the cause and degree of inaccuracy."}, {"stage": "Passage-Style Challenge", "src": "The plant closes tiny openings in its leaves during dry periods, thereby reducing water loss.", "opts": ["During dry conditions, the plant limits water loss by closing small leaf openings.", "The plant opens its leaves to collect more water during drought.", "Dry periods cause the plant to lose all of its water.", "Small openings prevent the leaves from closing."], "ans": 0, "map": "dry periods → dry conditions; reducing water loss → limits water loss; tiny openings → small leaf openings", "why": "A accurately restates the mechanism."}, {"stage": "Passage-Style Challenge", "src": "Increased demand for ivory led to intense hunting of elephants, causing their numbers to fall sharply in some regions.", "opts": ["Elephant populations rose where ivory was valuable.", "Strong demand for ivory contributed to a steep decline in elephants in some areas.", "Elephants were hunted because their numbers were already low.", "Ivory became less valuable as elephant populations declined."], "ans": 1, "map": "increased demand → strong demand; intense hunting → contributed to; numbers fell sharply → steep decline", "why": "B preserves the full causal chain."}, {"stage": "Passage-Style Challenge", "src": "Because the island is isolated, many of its species evolved independently and are found nowhere else.", "opts": ["Isolation allowed many island species to develop separately and become unique to the island.", "Species from other islands frequently migrated there.", "The island has few species because evolution did not occur there.", "Most island species are also common elsewhere."], "ans": 0, "map": "isolated → isolation; evolved independently → develop separately; found nowhere else → unique to the island", "why": "A keeps all the core ideas."}];
-let idx=0, score=0, answered=false, selectedChoice=null;
-const stageStats={};
+const questions = [{"stage":"Word & Phrase Changes","src":"The population declined rapidly after the severe winter.","opts":["The harsh winter caused the population to fall quickly.","The population rapidly recovered after the harsh winter.","The population fell before the severe winter began.","The severe winter became shorter as the population declined."],"ans":0,"map":"declined rapidly → fell quickly; severe winter → harsh winter","why":"A preserves the original sequence and meaning. B reverses the change, C changes the timeline, and D invents a relationship."},{"stage":"Word & Phrase Changes","src":"The device was designed primarily for use in hospitals.","opts":["The device was used in hospitals only after its design changed.","The device was mainly designed by people working in hospitals.","The device was created mainly to be used in hospitals.","Hospitals were primarily designed to use the new device."],"ans":2,"map":"designed primarily → created mainly; for use in hospitals → to be used in hospitals","why":"C preserves both purpose and emphasis. The other options keep similar vocabulary but change who designed what, or change the timeline."},{"stage":"Word & Phrase Changes","src":"The discovery had a significant impact on later research.","opts":["Later research had a significant effect on how the discovery was made.","The discovery strongly influenced research that followed.","Researchers made the discovery only after conducting later studies.","The discovery became less significant as later research continued."],"ans":1,"map":"significant impact → strongly influenced; later research → research that followed","why":"B keeps the original direction of influence. A and C reverse the relationship; D changes the degree of importance."},{"stage":"Word & Phrase Changes","src":"The animals obtain most of their water from the food they eat.","opts":["The animals eat most of their food only after obtaining water.","Most of the animals' food is obtained from water sources.","The animals obtain food mainly by searching near water.","The animals get the majority of their water through their diet."],"ans":3,"map":"obtain → get; most → majority; food they eat → diet","why":"D keeps the same source of water. The distractors reuse the same words but alter the relationship."},{"stage":"Grammar & Relationship Changes","src":"Because rainfall was limited, crops grew poorly.","opts":["Rainfall became limited because the crops grew poorly.","Crop growth was reduced because there was little rainfall.","Crops grew poorly before rainfall became limited.","Limited crop growth caused rainfall to decrease."],"ans":1,"map":"rainfall was limited → there was little rainfall; crops grew poorly → crop growth was reduced","why":"B preserves the cause-effect relationship. A and D reverse it; C changes causation into sequence."},{"stage":"Grammar & Relationship Changes","src":"The construction of railroads allowed goods to be transported more efficiently.","opts":["Goods were transported less efficiently after railroads were constructed.","Railroads were constructed because goods were already transported efficiently.","Efficient transportation made it possible to construct railroads.","Goods became easier to transport once railroads were built."],"ans":3,"map":"construction of railroads → railroads were built; allowed ... more efficiently → became easier to transport","why":"D preserves the effect of railroad construction. B and C reverse cause and effect; A reverses the outcome."},{"stage":"Grammar & Relationship Changes","src":"Although the region is dry, several crops can be grown there.","opts":["Several crops can grow there despite the region's dry climate.","Several crops can grow there because the region has become dry.","The region is dry because several crops are grown there.","The region supports crops only when the dry climate disappears."],"ans":0,"map":"although → despite; region is dry → dry climate; can be grown → can grow","why":"A preserves the contrast. B turns contrast into cause; C reverses the relationship; D adds an unsupported condition."},{"stage":"Grammar & Relationship Changes","src":"The new law prohibited factories from dumping waste into the river.","opts":["Factories prevented the new law from controlling waste in the river.","The new law permitted factories to dispose of waste under certain conditions.","The new law prevented factories from disposing of waste in the river.","Waste from factories caused the river to prohibit new laws."],"ans":2,"map":"prohibited → prevented; dumping waste → disposing of waste","why":"C preserves both restriction and agent. B changes prohibition into permission; A and D reverse roles."},{"stage":"Paraphrase vs. Trap","src":"Most residents opposed the proposal because they believed it would increase traffic.","opts":["Every resident rejected the proposal after traffic had already increased.","Many residents supported the proposal because they expected more traffic.","Residents opposed increased traffic, but most supported the proposal itself.","Many residents objected to the proposal because they expected heavier traffic."],"ans":3,"map":"most → many; opposed → objected; believed it would increase traffic → expected heavier traffic","why":"D preserves quantity, attitude, and prediction. A changes most to every and prediction to fact; B and C reverse the attitude."},{"stage":"Paraphrase vs. Trap","src":"The study found little evidence that the treatment improved long-term memory.","opts":["The study proved that the treatment permanently improved memory.","The study found limited support for a lasting improvement in memory.","The study found no evidence that the treatment affected any kind of memory.","The treatment slightly improved memory, so the study confirmed its effectiveness."],"ans":1,"map":"little evidence → limited support; improved long-term memory → lasting improvement in memory","why":"B preserves uncertainty. A and D make the claim too certain; C changes little evidence into no evidence and broadens the claim."},{"stage":"Paraphrase vs. Trap","src":"Some coastal cities have built sea walls to reduce damage from storms.","opts":["Most coastal cities use sea walls to prevent all storm damage.","Some coastal cities build storm barriers because storms have become harmless.","Certain coastal cities use sea walls to lessen storm damage.","Sea walls in some coastal cities reduce the number of storms that occur."],"ans":2,"map":"some → certain; reduce → lessen; damage from storms → storm damage","why":"C preserves both scope and purpose. A exaggerates quantity and effectiveness; B and D alter the meaning."},{"stage":"Paraphrase vs. Trap","src":"The company delayed the launch until engineers resolved several technical problems.","opts":["The launch was postponed while engineers fixed several technical issues.","Engineers delayed the technical problems until after the product launch.","The company launched the product before engineers solved the technical issues.","The company permanently cancelled the launch because the technical problems could not be fixed."],"ans":0,"map":"delayed → postponed; resolved → fixed; technical problems → technical issues","why":"A preserves timing and outcome. B reverses roles; C reverses the timeline; D changes delay into cancellation."},{"stage":"TOEFL-Style Restatement","src":"As cities expanded, farmland near urban areas was gradually converted to housing.","opts":["As farmland expanded, nearby residential areas gradually became urban land.","As urban areas grew, nearby farmland slowly became residential land.","Housing near cities was gradually converted back into farmland as cities grew.","Urban growth stopped because nearby farmland had already become housing."],"ans":1,"map":"cities expanded → urban areas grew; farmland → agricultural land; converted to housing → became residential land","why":"B preserves direction, location, and gradual change. The others manipulate the same vocabulary but change the process."},{"stage":"TOEFL-Style Restatement","src":"Unlike earlier models, the new machine requires less maintenance and consumes less energy.","opts":["Compared with older models, the new machine uses less energy but needs more maintenance.","Earlier models required less maintenance because they consumed more energy.","The new machine requires no maintenance because it uses almost no energy.","Compared with older models, the new machine needs less upkeep and uses less energy."],"ans":3,"map":"unlike earlier models → compared with older models; maintenance → upkeep; consumes less energy → uses less energy","why":"D preserves both comparative advantages. A changes one dimension; B invents causation; C makes the claim absolute."},{"stage":"TOEFL-Style Restatement","src":"Scientists initially attributed the decline to disease, but later evidence suggested habitat loss was the main cause.","opts":["Researchers first blamed habitat loss, but later evidence showed disease was the main cause.","Disease and habitat loss were identified from the beginning as equally important causes.","Researchers first blamed disease, but later evidence pointed mainly to habitat loss.","Later evidence proved that neither disease nor habitat loss contributed to the decline."],"ans":2,"map":"initially attributed → first blamed; suggested → pointed to; main cause → mainly","why":"C preserves the change in explanation over time. A reverses it; B removes the change; D contradicts the source."},{"stage":"TOEFL-Style Restatement","src":"By the time the expedition arrived, the settlement had already been abandoned.","opts":["The residents had left the settlement before the expedition reached it.","The residents abandoned the settlement after the expedition arrived.","The expedition arrived because the residents had abandoned the settlement.","The expedition and the residents left the settlement at approximately the same time."],"ans":0,"map":"had already been abandoned → residents had left before; arrived → reached","why":"A preserves the sequence. B reverses it, C invents causation, and D changes the timing."},{"stage":"Passage-Style Challenge","src":"The introduction of refrigeration transformed food distribution. Products that once spoiled quickly could now be shipped over much greater distances.","opts":["Refrigeration made food spoil more slowly because it was shipped over shorter distances.","Food could be transported farther before refrigeration because products spoiled quickly.","Refrigeration changed food distribution by preventing products from being transported long distances.","Refrigeration allowed perishable food to be transported much farther than before."],"ans":3,"map":"spoiled quickly → perishable; shipped over much greater distances → transported much farther","why":"D accurately combines both ideas. The other choices reuse the same concepts but reverse distance, timing, or effect."},{"stage":"Passage-Style Challenge","src":"Many early maps were based on travelers' reports rather than direct measurement, so they often contained serious inaccuracies.","opts":["Travelers' reports were inaccurate because early maps depended mainly on direct measurement.","Early maps were often inaccurate because they relied on travelers' reports instead of direct measurement.","Early maps became more accurate when travelers replaced direct measurement with personal reports.","Direct measurement caused many early maps to contain serious inaccuracies."],"ans":1,"map":"based on → relied on; rather than → instead of; serious inaccuracies → often inaccurate","why":"B preserves the reason for the inaccuracies. A, C, and D manipulate the same elements but reverse the relationship."},{"stage":"Passage-Style Challenge","src":"The plant closes tiny openings in its leaves during dry periods, thereby reducing water loss.","opts":["During dry conditions, the plant increases water loss by opening small spaces in its leaves.","The plant closes its leaves because dry periods are caused by water loss.","During dry conditions, the plant reduces water loss by closing small openings in its leaves.","The plant reduces dry periods by preventing water from entering openings in its leaves."],"ans":2,"map":"dry periods → dry conditions; tiny openings → small openings; reducing water loss → reduces water loss","why":"C preserves mechanism and purpose. The distractors reuse almost all key vocabulary but alter the causal chain."},{"stage":"Passage-Style Challenge","src":"Increased demand for ivory led to intense hunting of elephants, causing their numbers to fall sharply in some regions.","opts":["Strong demand for ivory increased elephant hunting and sharply reduced some elephant populations.","Falling elephant populations created stronger demand for ivory and caused more hunting.","Intense hunting decreased the demand for ivory as elephant populations grew in some regions.","Elephant populations fell sharply because ivory became less valuable in regions where hunting declined."],"ans":0,"map":"increased demand → strong demand; intense hunting → increased elephant hunting; numbers fell sharply → sharply reduced populations","why":"A preserves the full causal chain: demand → hunting → population decline. The others reverse or distort that chain."}];
+
+// Paste the Google Apps Script /exec URL here after deployment.
+// Local browser persistence works even if this stays blank.
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwSF0dCArNvc1qFE-iRdtcxO3AFWHU-x_-l0dXL1DCA3GiVrXsr2zplcbOKyvYLwFuG/exec';
+
+const STORAGE_KEY = 'paraphraseDetective.progress.v4';
+const DEVICE_KEY = 'paraphraseDetective.studentId.v1';
+
+let idx = 0;
+let score = 0;
+let answered = false;
+let selectedChoice = null;
+let startedAt = null;
+let completedAt = null;
+let answers = [];
+const stageStats = {};
+
+function makeId(){
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+}
+
+function getStudentId(){
+  let id = localStorage.getItem(DEVICE_KEY);
+  if(!id){
+    id = makeId();
+    localStorage.setItem(DEVICE_KEY,id);
+  }
+  return id;
+}
+
+function stateObject(){
+  return {
+    version:4,
+    studentId:getStudentId(),
+    name:document.getElementById('studentName')?.value.trim() || '',
+    className:document.getElementById('studentClass')?.value.trim() || '',
+    idx, score, answered, selectedChoice,
+    reasonDraft:document.getElementById('reasonInput')?.value || '',
+    startedAt, completedAt,
+    answers,
+    stageStats:JSON.parse(JSON.stringify(stageStats)),
+    completed:!!completedAt
+  };
+}
+
+function saveLocal(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateObject()));
+  }catch(e){
+    console.warn('Could not save local progress', e);
+  }
+}
+
+function clearStageStats(){
+  for(const k in stageStats) delete stageStats[k];
+}
+
+function applyLoadedState(s){
+  idx = Math.max(0, Math.min(Number(s.idx)||0, questions.length-1));
+  score = Number(s.score)||0;
+  answered = !!s.answered;
+  selectedChoice = (s.selectedChoice===null || s.selectedChoice===undefined) ? null : Number(s.selectedChoice);
+  startedAt = s.startedAt || null;
+  completedAt = s.completedAt || null;
+  answers = Array.isArray(s.answers) ? s.answers : [];
+  clearStageStats();
+  if(s.stageStats && typeof s.stageStats === 'object'){
+    Object.entries(s.stageStats).forEach(([k,v])=>stageStats[k]=v);
+  }
+  document.getElementById('studentName').value = s.name || '';
+  document.getElementById('studentClass').value = s.className || '';
+}
+
+function loadSaved(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || s.version !== 4) return null;
+    return s;
+  }catch(e){
+    return null;
+  }
+}
+
+function setupResumePrompt(){
+  const s = loadSaved();
+  if(!s) return;
+
+  applyLoadedState(s);
+  if(s.completed){
+    showResult(true);
+    return;
+  }
+
+  if((s.idx||0)>0 || (s.answers||[]).length>0 || s.selectedChoice!==null){
+    const note = document.getElementById('resumeNote');
+    note.classList.remove('hidden');
+    note.innerHTML =
+      '<b>Saved progress found.</b> You were on question ' + (idx+1) +
+      ' of ' + questions.length + '.'
+      + '<div class="resume-actions">'
+      + '<button class="primary" onclick="resumeQuiz()">Continue</button>'
+      + '<button class="secondary" onclick="discardSaved()">Start over</button>'
+      + '</div>';
+  }
+}
+
+function discardSaved(){
+  localStorage.removeItem(STORAGE_KEY);
+  idx=0; score=0; answered=false; selectedChoice=null;
+  startedAt=null; completedAt=null; answers=[];
+  clearStageStats();
+  document.getElementById('studentName').value='';
+  document.getElementById('studentClass').value='';
+  document.getElementById('resumeNote').classList.add('hidden');
+}
+
+function resumeQuiz(){
+  document.getElementById('start').classList.add('hidden');
+  document.getElementById('result').classList.add('hidden');
+  document.getElementById('quiz').classList.remove('hidden');
+  render(true);
+  syncProgress('in_progress');
+}
 
 function startQuiz(){
+  const name = document.getElementById('studentName').value.trim();
+  if(!name){
+    alert('Please enter your name first.');
+    document.getElementById('studentName').focus();
+    return;
+  }
+  if(!startedAt) startedAt = new Date().toISOString();
+  saveLocal();
   document.getElementById('start').classList.add('hidden');
   document.getElementById('quiz').classList.remove('hidden');
-  render();
+  render(false);
+  syncProgress('in_progress');
 }
-function render(){
-  answered=false;
-  selectedChoice=null;
+
+function render(restoring=false){
   const q=questions[idx];
   document.getElementById('stage').textContent='Level: '+q.stage;
   document.getElementById('score').textContent='Score: '+score;
   document.getElementById('qnum').textContent=`Question ${idx+1} of ${questions.length}`;
   document.getElementById('source').textContent=q.src;
   document.getElementById('bar').style.width=((idx)/questions.length*100)+'%';
-  const box=document.getElementById('options'); box.innerHTML='';
+
+  const box=document.getElementById('options');
+  box.innerHTML='';
   ['A','B','C','D'].forEach((L,i)=>{
     const b=document.createElement('button');
     b.className='opt';
@@ -141,15 +282,31 @@ function render(){
     b.onclick=()=>choose(i,b);
     box.appendChild(b);
   });
+
   document.getElementById('reasonBox').classList.add('hidden');
-  document.getElementById('reasonInput').value='';
   document.getElementById('feedback').classList.remove('show');
   document.getElementById('nextBtn').classList.add('hidden');
-}
-function choose(choice,btn){
-  if(answered) return;
-  selectedChoice=choice;
 
+  if(restoring){
+    const s=loadSaved();
+    const draft=s?.reasonDraft || '';
+    document.getElementById('reasonInput').value=draft;
+
+    if(answered){
+      restoreSubmittedAnswer();
+    }else if(selectedChoice!==null){
+      markPendingChoice(selectedChoice);
+      document.getElementById('reasonBox').classList.remove('hidden');
+    }
+  }else{
+    answered=false;
+    selectedChoice=null;
+    document.getElementById('reasonInput').value='';
+    saveLocal();
+  }
+}
+
+function markPendingChoice(choice){
   const buttons=[...document.querySelectorAll('.opt')];
   buttons.forEach((b,i)=>{
     b.classList.remove('correct','wrong','dim');
@@ -157,61 +314,51 @@ function choose(choice,btn){
       b.style.borderColor='#8b75e8';
       b.style.background='#f6f3ff';
       b.style.color='#2f1c7a';
-      b.style.opacity='1';
-    } else {
+    }else{
       b.style.borderColor='';
       b.style.background='';
       b.style.color='';
-      b.style.opacity='1';
     }
   });
+}
 
+function choose(choice,btn){
+  if(answered) return;
+  selectedChoice=choice;
+  markPendingChoice(choice);
   document.getElementById('reasonBox').classList.remove('hidden');
+  saveLocal();
   document.getElementById('reasonInput').focus();
 }
-function submitReason(){
-  if(selectedChoice===null) return;
 
-  const reason=document.getElementById('reasonInput').value.trim();
-  if(!reason){
-    alert('Please write a short reason or identify the paraphrase before submitting.');
-    document.getElementById('reasonInput').focus();
-    return;
-  }
+function currentSavedAnswer(){
+  return answers.find(a=>a.questionIndex===idx) || null;
+}
 
-  answered=true;
+function paintSubmittedAnswer(choice){
   const q=questions[idx];
-
-  if(!stageStats[q.stage]) stageStats[q.stage]={right:0,total:0};
-  stageStats[q.stage].total++;
-
   const buttons=[...document.querySelectorAll('.opt')];
   buttons.forEach((b,i)=>{
     b.style.borderColor='';
     b.style.background='';
     b.style.color='';
-    b.style.opacity='';
     if(i===q.ans) b.classList.add('correct');
-    else if(i===selectedChoice) b.classList.add('wrong');
+    else if(i===choice) b.classList.add('wrong');
     else b.classList.add('dim');
     b.disabled=true;
   });
+}
 
-  const ok=selectedChoice===q.ans;
-  if(ok){score++;stageStats[q.stage].right++;}
-  document.getElementById('score').textContent='Score: '+score;
-
+function showFeedback(choice, reason){
+  const q=questions[idx];
+  const ok=choice===q.ans;
+  paintSubmittedAnswer(choice);
   document.getElementById('fbTitle').textContent=ok
     ? '✓ Correct — same meaning!'
     : '✗ Not quite — inspect the meaning change.';
-
-  document.getElementById('yourReason').innerHTML=
-    '<b>Your explanation:</b> '+escapeHtml(reason);
-
+  document.getElementById('yourReason').innerHTML='<b>Your explanation:</b> '+escapeHtml(reason);
   document.getElementById('fbWhy').textContent=q.why;
-  document.getElementById('mapping').innerHTML=
-    '<b>Paraphrase map:</b> '+escapeHtml(q.map);
-
+  document.getElementById('mapping').innerHTML='<b>Paraphrase map:</b> '+escapeHtml(q.map);
   document.getElementById('reasonBox').classList.add('hidden');
   document.getElementById('feedback').classList.add('show');
   document.getElementById('nextBtn').textContent=
@@ -219,36 +366,201 @@ function submitReason(){
   document.getElementById('nextBtn').classList.remove('hidden');
 }
 
-function nextQuestion(){
-  if(idx<questions.length-1){idx++;render();}
-  else showResult();
+function restoreSubmittedAnswer(){
+  const a=currentSavedAnswer();
+  if(!a){
+    answered=false;
+    selectedChoice=null;
+    saveLocal();
+    return;
+  }
+  selectedChoice=a.choice;
+  showFeedback(a.choice,a.reason||'');
 }
-function showResult(){
-  document.getElementById('bar').style.width='100%';
+
+function submitReason(){
+  if(selectedChoice===null) return;
+  const reason=document.getElementById('reasonInput').value.trim();
+  if(!reason){
+    alert('Please write a short reason or identify the paraphrase before submitting.');
+    document.getElementById('reasonInput').focus();
+    return;
+  }
+
+  const q=questions[idx];
+  const ok=selectedChoice===q.ans;
+
+  // Only score the question once.
+  let existingIndex=answers.findIndex(a=>a.questionIndex===idx);
+  if(existingIndex<0){
+    if(!stageStats[q.stage]) stageStats[q.stage]={right:0,total:0};
+    stageStats[q.stage].total++;
+    if(ok){
+      score++;
+      stageStats[q.stage].right++;
+    }
+    answers.push({
+      questionIndex:idx,
+      stage:q.stage,
+      choice:selectedChoice,
+      correctAnswer:q.ans,
+      correct:ok,
+      reason,
+      answeredAt:new Date().toISOString()
+    });
+  }else{
+    answers[existingIndex].reason=reason;
+  }
+
+  answered=true;
+  document.getElementById('score').textContent='Score: '+score;
+  showFeedback(selectedChoice,reason);
+  saveLocal();
+  syncProgress('in_progress');
+}
+
+function nextQuestion(){
+  if(idx<questions.length-1){
+    idx++;
+    answered=false;
+    selectedChoice=null;
+    saveLocal();
+    render(false);
+    syncProgress('in_progress');
+  }else{
+    completedAt = new Date().toISOString();
+    saveLocal();
+    showResult(false);
+    syncProgress('completed');
+  }
+}
+
+function showResult(fromLoad=false){
+  document.getElementById('start').classList.add('hidden');
   document.getElementById('quiz').classList.add('hidden');
   document.getElementById('result').classList.remove('hidden');
+
   const pct=Math.round(score/questions.length*100);
   document.getElementById('finalScore').textContent=`${score}/${questions.length}`;
-  let msg=pct>=88?'Excellent paraphrase awareness.':pct>=72?'Good work — your meaning matching is developing well.':pct>=56?'You are getting there — review the trap explanations.':'Focus on meaning before matching vocabulary.';
+  let msg=pct>=88?'Excellent paraphrase awareness.'
+    :pct>=72?'Good work — your meaning matching is developing well.'
+    :pct>=56?'You are getting there — review the trap explanations.'
+    :'Focus on meaning before matching vocabulary.';
+
   const n=document.getElementById('studentName').value.trim();
   document.getElementById('finalMsg').textContent=(n?n+', ':'')+msg+' ('+pct+'%)';
-  const bd=document.getElementById('breakdown'); bd.innerHTML='';
+
+  const bd=document.getElementById('breakdown');
+  bd.innerHTML='';
   Object.entries(stageStats).forEach(([stage,s])=>{
-    const d=document.createElement('div');d.className='stat';
+    const d=document.createElement('div');
+    d.className='stat';
     d.innerHTML=`<b>${escapeHtml(stage)}</b><br>${s.right} / ${s.total} correct`;
     bd.appendChild(d);
   });
+
+  if(!fromLoad) saveLocal();
 }
+
+function copyResult(){
+  const name=document.getElementById('studentName').value.trim() || 'Student';
+  const cls=document.getElementById('studentClass').value.trim();
+  const pct=Math.round(score/questions.length*100);
+  let line=`Paraphrase Detective — ${name}`;
+  if(cls) line+=` — ${cls}`;
+  line+=` — ${score}/${questions.length} (${pct}%)`;
+  navigator.clipboard.writeText(line).then(
+    ()=>alert('Result copied.'),
+    ()=>window.prompt('Copy this result:',line)
+  );
+}
+
 function restartQuiz(){
+  const ok=confirm('Start over? This will erase the saved attempt on this browser.');
+  if(!ok) return;
+  localStorage.removeItem(STORAGE_KEY);
   idx=0;score=0;answered=false;selectedChoice=null;
-  for(const k in stageStats) delete stageStats[k];
+  startedAt=null;completedAt=null;answers=[];
+  clearStageStats();
   document.getElementById('result').classList.add('hidden');
-  document.getElementById('quiz').classList.remove('hidden');
-  render();
+  document.getElementById('quiz').classList.add('hidden');
+  document.getElementById('start').classList.remove('hidden');
+  document.getElementById('resumeNote').classList.add('hidden');
 }
+
+function backendConfigured(){
+  return BACKEND_URL && !BACKEND_URL.includes('PASTE_APPS_SCRIPT');
+}
+
+function setSyncStatus(msg){
+  const el=document.getElementById('syncStatus');
+  if(el) el.textContent=msg;
+}
+
+function progressPayload(status){
+  const name=document.getElementById('studentName')?.value.trim() || '';
+  const cls=document.getElementById('studentClass')?.value.trim() || '';
+  const last=answers.length ? answers[answers.length-1] : null;
+  return {
+    studentId:getStudentId(),
+    name,
+    className:cls,
+    status,
+    currentQuestion: completedAt ? questions.length : Math.min(idx+1,questions.length),
+    totalQuestions:questions.length,
+    answeredCount:answers.length,
+    score,
+    percent:Math.round(score/questions.length*100),
+    lastQuestion:last ? last.questionIndex+1 : '',
+    lastChoice:last ? ['A','B','C','D'][last.choice] : '',
+    lastCorrect:last ? !!last.correct : '',
+    lastReason:last ? last.reason : '',
+    startedAt:startedAt || '',
+    completedAt:completedAt || '',
+    answers
+  };
+}
+
+function syncProgress(status='in_progress'){
+  if(!backendConfigured()){
+    setSyncStatus('Progress is saved on this browser.');
+    return;
+  }
+
+  setSyncStatus('Saved locally • syncing instructor view…');
+
+  const payload=progressPayload(status);
+  const body='payload='+encodeURIComponent(JSON.stringify(payload));
+
+  // no-cors makes this reliable from a static GitHub Pages site to Apps Script.
+  fetch(BACKEND_URL,{
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+    body
+  }).then(()=>{
+    setSyncStatus('Saved locally • instructor progress synced.');
+  }).catch(()=>{
+    setSyncStatus('Saved locally • instructor sync unavailable.');
+  });
+}
+
 function escapeHtml(s){
-  return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  return String(s??'').replace(/[&<>"']/g,m=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+  }[m]));
 }
+
+// Persist an explanation while the student is typing, so even a refresh mid-answer is safe.
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('reasonInput').addEventListener('input',saveLocal);
+  document.getElementById('studentName').addEventListener('input',saveLocal);
+  document.getElementById('studentClass').addEventListener('input',saveLocal);
+  setupResumePrompt();
+});
+
+window.addEventListener('beforeunload',saveLocal);
 </script>
+
 </body>
 </html>
